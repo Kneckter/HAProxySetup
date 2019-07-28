@@ -60,6 +60,9 @@ frontend proxy_in
   mode http
   option nolinger
   option http_proxy
+  
+  # Set the max connections to the frontend higher than the default 2000
+  maxconn 5000
 
   # NAT static host names to a different backend
   # This ACL looks for the port 9001 in your backendurl when Manager sends data to RDM.
@@ -91,6 +94,10 @@ backend proxy_out
   # If you're setting up HAProxy on an externally hosted server, use `balance leastconn`.
   balance source
   #balance leastconn
+  
+  # Set the max connections for each server to 1000 so you don't drop data
+  # This defauls to 10% of maxconn or 10% of the default (which limits it to 200 connections)
+  fullconn 1000
 
   # This section of external-check settings is important for checking if your proxy IP is banned.
   option external-check
