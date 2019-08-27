@@ -17,6 +17,11 @@ Install HAProxy 1.8 LTR with these commands for debian-based linux:
 Command reference is here: https://haproxy.debian.net/#?distribution=Ubuntu&release=bionic&version=1.8
 
 --------------------------------------------------
+**Optionally** You can install Squid to make your server into a proxy for use as a backend to only proxy the auth requests. No changes need to be made to the Squid config to work with this. Use these commands for debian-based linux:
+    apt-get update
+    apt-get install squid
+
+--------------------------------------------------
 Save a backup the config file: /etc/haproxy/haproxy.cfg as haproxy.cfg.old
 Remove everything in the haproxy.cfg and add the below text. Read the comments to make changes for your setup.
 ```
@@ -69,13 +74,22 @@ frontend proxy_in
   acl port_rdm url_port 9001
   #acl host_name hdr_dom(host) -i ispoofer.com globalplusplus.com 104.31.70.46 104.31.71.46 104.25.91.97 104.25.92.97
   acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com
+  
+  # These two ACLs are used when a Squid backend as default backend is used so you can split these out to the paid proxies
+  #acl auth hdr_dom(host) -i pgorelease.nianticlabs.com sso.pokemon.com
+  #acl gd hdr_dom(host) -i api.ipotter.cc ipotter.cc ipotter.app 104.28.10.9 104.28.11.9
+
+  http-request silent-drop if host_name
 
   # This line is used to send Manager traffic to RDM instead of the external proxies.
-  http-request silent-drop if host_name
   use_backend rdm if port_rdm
+  # This line is used when a Squid proxy is setup so we can send auth and gd requests through the paid proxies.
+  #use_backend proxy_out if auth || gd
 
-  # This line is used to send all traffic not related to RDM to the proxies themselves.
+  # This line is used to send all traffic not related to RDM to the proxies themselves. 
+  # Comment out the proxy_out line and uncomment the squid line if you want all non-auth traffic to use the Squid proxy.
   default_backend proxy_out
+  #default_backend squid
 
 backend rdm
   # If you're setting up HAProxy on the same network, use `balance source`.
@@ -88,6 +102,12 @@ backend rdm
   # This assumes Nginx is installed on the same machine HAProxy is. If not, change the IP address to the server Nginx is installed on.
   # A server block for Nginx is explained in the below sections.
   server rdm 127.0.0.1:9002
+
+backend squid
+  balance source
+  fullconn 1000
+
+  server squid localhost:3128
 
 backend proxy_out
   # If you're setting up HAProxy on the same network, use `balance source`.
