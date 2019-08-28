@@ -11,15 +11,19 @@ If you want to run this on a local Mac, you can figure out the difference in set
 
 --------------------------------------------------
 Install HAProxy 1.8 LTR with these commands for debian-based linux:
-    apt-get update
-    apt-get install haproxy=1.8.\*
+```
+apt-get update
+apt-get install haproxy=1.8.\*
+```
 
 Command reference is here: https://haproxy.debian.net/#?distribution=Ubuntu&release=bionic&version=1.8
 
 --------------------------------------------------
 **Optionally** You can install Squid to make your server into a proxy for use as a backend to only proxy the auth requests. No changes need to be made to the Squid config to work with this. Use these commands for debian-based linux:
-    apt-get update
-    apt-get install squid
+```
+apt-get update
+apt-get install squid
+```
 
 --------------------------------------------------
 Save a backup the config file: /etc/haproxy/haproxy.cfg as haproxy.cfg.old
@@ -145,23 +149,25 @@ backend proxy_out
 Create the bancheck.sh file to check your proxies are working with pokemon and niantic.
 Run `chmod +x bancheck.sh` command to make it into an executable script.
 Save it to the same location as the "external-check command" line.
-	#!/bin/bash
-	PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-	VIP=$1
-	VPT=$2
-	RIP=$3
-	RPT=$4
+```
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+VIP=$1
+VPT=$2
+RIP=$3
+RPT=$4
 
-	cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://pgorelease.nianticlabs.com/plfe/version 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK" && 
-	curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
-	exit ${?}
-
+cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://pgorelease.nianticlabs.com/plfe/version 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK" && 
+curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
+exit ${?}
+```
 
 Note that this script must exit with `0` for the check to pass. You can test this script manually by running the following commands:
-	`RIP=ProxyIPAddress` #This sets the RIP environment variable to the proxy IP address. You can use the HAProxy address.
-	`RTP=ProxyPort` #This sets the RTP environment variable to the proxy IP port. You can use the HAProxy port.
-	`./banncheck.sh` #This runs the script.
-	`echo $?` #This displays the results of the script. It will most likely be 0 or 1. 
+
+- `RIP=ProxyIPAddress` #This sets the RIP environment variable to the proxy IP address. You can use the HAProxy address.
+- `RTP=ProxyPort` #This sets the RTP environment variable to the proxy IP port. You can use the HAProxy port.
+- `./banncheck.sh` #This runs the script.
+- `echo $?` #This displays the results of the script. It will most likely be 0 or 1. 
 
 --------------------------------------------------
 Edit the Ngixn config file: /etc/nginx/conf.d/default.conf. 
@@ -183,17 +189,21 @@ server {
 	
 --------------------------------------------------
 Test nginx and restart it. Restart HAProxy too and then check the status for any errors. Logs should also be sent to /var/log/ if needed.
-	`sudo nginx -t`
-	`sudo service nginx restart`
-	`sudo service haproxy restart`
-	`sudo service haproxy status`
+```
+sudo nginx -t
+sudo service nginx restart
+sudo service haproxy restart
+sudo service haproxy status
+```
 
 --------------------------------------------------
 Test the setup with curl. The first one should show "The file / was not found." because you reached RDM's data port.
 The second one should show "HTTP/1.1 200 Connection established" and some other junk.
 Relace the IP address with the host address of HAProxy.
-	`curl -x 192.168.0.6:9100 http://192.168.0.6:9001/`
-	`curl -I -x 192.168.0.6:9100 https://sso.pokemon.com/sso/login`
+```
+curl -x 192.168.0.6:9100 http://192.168.0.6:9001/
+curl -I -x 192.168.0.6:9100 https://sso.pokemon.com/sso/login
+```
 
 --------------------------------------------------
 View the stats page to see that data went through all ends here: http://192.168.0.6:9100/haproxy?stats.
@@ -204,10 +214,11 @@ In "proxy_out", the "chk" column near the end is how many checks your proxies fa
 --------------------------------------------------
 I suggest testing this on one phone to ensure it is working correctly before switch all devices.
 Update the phones' proxy settings to use HAProxy. 
-	Settings > Wifi > SSID > Proxy > Manual > Enter your information.
+- Settings > Wifi > SSID > Proxy > Manual > Enter your information.
+
 You may also want to set a public DNS since addresses have resolution problems. 
-	Settings > Wifi > SSID > DNS
-	Google's DNSs are 8.8.8.8 and 8.8.4.4, either will work.
+- Settings > Wifi > SSID > DNS
+- Google's DNSs are 8.8.8.8 and 8.8.4.4, either will work.
 
 In RDM UIC Manager, ensure your backend URL uses the IP address and port 9001 of the HAProxy server.
 Check that the phone's data makes it to the map and you should be done.
