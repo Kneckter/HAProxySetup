@@ -26,6 +26,23 @@ apt-get install squid
 ```
 
 --------------------------------------------------
+**Optionally** You can configure squid to cache static assets to help lower your data usage with the below configuration:
+```
+maximum_object_size 200 MB
+cache_dir ufs /var/spool/squid 4096 16 256
+logfile_rotate 5
+cache_store_log daemon:/var/log/squid/store.log
+refresh_pattern -i \.(gif|png|jpg|jpeg|ico|bmp|obj)$ 10080 90% 43200 override-expire ignore-no-cache ignore-no-store ignore-private
+refresh_pattern -i \.(iso|avi|mov|wav|qt|mpg|mp3|mp4|mpeg|swf|flv|x-flv|wmv|au|mid|gmm)$ 43200 90% 432000 override-expire ignore-no-cache ignore-no-store ignore-private
+refresh_pattern -i \.(deb|rpm|exe|zip|tar|gz|tgz|ram|rar|bin|ppt|doc|tiff|tif|arj|lha|lzh|hqx|pdf|rtf)$ 10080 90% 43200 override-expire ignore-no-cache ignore-no-store ignore-private
+refresh_pattern -i \.index.(html|htm)$ 0 40% 10080
+refresh_pattern -i \.(html|htm|css|js|jsp|txt|xml|tsv|json)$ 1440 40% 40320
+refresh_pattern . 0 40% 40320
+```
+
+Note that you will have to comment out the old `refresh_pattern .` line.
+
+--------------------------------------------------
 Save a backup the config file: /etc/haproxy/haproxy.cfg as haproxy.cfg.old
 Remove everything in the haproxy.cfg and add the below text. Read the comments to make changes for your setup.
 ```
@@ -82,8 +99,13 @@ frontend proxy_in
   # These two ACLs are used when a Squid backend as default backend is used so you can split these out to the paid proxies
   #acl auth hdr_dom(host) -i pgorelease.nianticlabs.com sso.pokemon.com
   #acl gd hdr_dom(host) -i api.ipotter.cc ipotter.cc ipotter.app 104.28.10.9 104.28.11.9
+  
+  # If your data usage is high, I would suggest using this ACL and the second "silent-drop" so map tiles aren't downloaded.
+  #acl tiles hdr_dom(host) -i maps.nianticlabs.com
 
+  # Only use one of these to drop traffic.
   http-request silent-drop if host_name
+  #http-request silent-drop if host_name || tiles
 
   # This line is used to send Manager traffic to RDM instead of the external proxies.
   use_backend rdm if port_rdm
