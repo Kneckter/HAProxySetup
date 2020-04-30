@@ -67,6 +67,7 @@ defaults
   mode http
   option httplog
   option dontlognull
+  option forwardfor
   timeout connect 5s
   timeout client 60s
   timeout server 60s
