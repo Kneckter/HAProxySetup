@@ -94,8 +94,10 @@ frontend proxy_in
   # NAT static host names to a different backend
   # This ACL looks for the port 9001 in your backendurl when Manager sends data to RDM.
   acl port_rdm url_port 9001
+  
+  # These two ACLs are used to drop traffic. The one that's enabled should stop iOS updates
   #acl host_name hdr_dom(host) -i ispoofer.com globalplusplus.com 104.31.70.46 104.31.71.46 104.25.91.97 104.25.92.97
-  acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com
+  acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com apple.com
   
   # These two ACLs are used when a Squid backend as default backend is used so you can split these out to the paid proxies
   #acl auth hdr_dom(host) -i pgorelease.nianticlabs.com sso.pokemon.com
@@ -172,6 +174,7 @@ backend proxy_out
 Create the bancheck.sh file to check your proxies are working with pokemon and niantic.
 Run `chmod +x bancheck.sh` command to make it into an executable script.
 Save it to the same location as the "external-check command" line.
+If your proxy uses a UN/PW instead of IP whitelist, you will need to add `-U username:password` before the `-x` flag.
 ```
 #!/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -209,7 +212,18 @@ server {
   }
 }
 ```
-	
+If you use Apache as your webservice, this is an example of the above config:
+```
+<VirtualHost haproxy.domain.com:80>
+  KeepAlive On
+  ServerName 127.0.0.1
+  ProxyPreserveHost On
+  ProxyPass / http://127.0.0.1:9001/
+  ProxyPassReverse / http://127.0.0.1:9001/
+  
+  ErrorLog ${APACHE_LOG_DIR}/error.log
+</VirtualHost>
+```
 --------------------------------------------------
 Test nginx and restart it. Restart HAProxy too and then check the status for any errors. Logs should also be sent to /var/log/ if needed.
 ```
