@@ -131,8 +131,8 @@ frontend proxy_in
   #acl tiles hdr_dom(host) -i maps.nianticlabs.com
 
   # Only use one of these to drop traffic.
-  http-request silent-drop if host_name
-  #http-request silent-drop if host_name || tiles
+  http-request deny if host_name
+  #http-request deny if host_name || tiles
 
   # These are used to split the traffic on the paid proxies
   use_backend proxy_ptc if ptc_auth
