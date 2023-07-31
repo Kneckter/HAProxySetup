@@ -1,22 +1,41 @@
-# HAProxySetup
+# HAProxySetup for mapping
 --------------------------------------------------
-This guide should help people setup haproxy as a load balancer for multiple proxy endpoints.
+This guide should help you to setup haproxy as a load balancer for multiple proxy endpoints.
 
 HAProxy website: http://www.haproxy.org/
-HAProxy configuration documentation: http://cbonte.github.io/haproxy-dconv/1.8/configuration.html
+HAProxy configuration documentation: http://cbonte.github.io/haproxy-dconv/2.6/configuration.html
 
-Note that he HAProxy SHOULD be installed on the same network at the phones. Otherwise, if you use an external server, they will all share one public IP address and load balance differently (still works, just follow the notes). The RDM and Nginx servers do not need to be local.
+HAProxy SHOULD be installed on the same network as the MITM clients.
+Otherwise, if you use an external server, they will all share one public IP address and load balance differently (still works, just follow the notes). The RDM and Nginx servers do not need to be local.
 
 If you want to run this on a local Mac, you can figure out the difference in settings (install with `brew install haproxy`) or install VirtualBox and load an Ubuntu VM on your Mac.
 
 --------------------------------------------------
-Install HAProxy 1.8 LTR with these commands for debian-based linux:
+Install HAProxy 2.6 LTS with these commands on debian 11:
+
+**Login as root or use sudo -i  for a root shell.**
+
+First enable a dedicated repository:
+```
+curl https://haproxy.debian.net/bernat.debian.org.gpg \
+      | gpg --dearmor > /usr/share/keyrings/haproxy.debian.net.gpg
+ ```
+ ```     
+echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
+      http://haproxy.debian.net bullseye-backports-2.6 main \
+      > /etc/apt/sources.list.d/haproxy.list
+ ```
+ Then, use the following commands:
 ```
 apt-get update
-apt-get install haproxy=1.8.\*
+apt-get install haproxy=2.6.\*
 ```
+You will get the _latest_ release of HAProxy 2.6 (and stick to this branch).
 
-Command reference is here: https://haproxy.debian.net/#?distribution=Ubuntu&release=bionic&version=1.8
+Command reference is here: https://haproxy.debian.net/#distribution=Debian&release=bullseye&version=2.6
+
+For other Debian or Ubuntu release you find all commands here:
+https://haproxy.debian.net/
 
 --------------------------------------------------
 Install Squid to make your server into a proxy for use as a backend to only proxy the auth requests. No changes need to be made to the Squid config to work with this. Use these commands for debian-based linux:
@@ -24,8 +43,8 @@ Install Squid to make your server into a proxy for use as a backend to only prox
 apt-get update
 apt-get install squid
 ```
-
 --------------------------------------------------
+*Optional configuration*
 Configure squid to cache static assets to help lower your data usage with the below configuration:
 ```
 maximum_object_size 200 MB
@@ -48,6 +67,7 @@ Remove everything in the haproxy.cfg and add the below text. Read the comments t
 ```
 global
   external-check
+  insecure-fork-wanted				  
   log /dev/log local1 notice
 
   # Default SSL material locations
@@ -85,41 +105,54 @@ frontend proxy_in
   # The stats page is not required but it should be used during the initial setup so you know it works.
   stats uri /haproxy?stats
   mode http
-  option nolinger
-  option http_proxy
-  
-  # Set the max connections to the frontend higher than the default 2000
+  option http-use-proxy-header
+  option accept-invalid-http-request
+
+ # Set the max connections to the frontend higher than the default 2000
   maxconn 5000
 
-  # NAT static host names to a different backend
-  # This ACL looks for the port 9001 in your backendurl when Manager sends data to RDM.
-  acl port_rdm url_port 9001
-  
-  # This ACL is used to drop traffic. You can create others to block any traffic
-  #acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com apple.com
-  
   # These two ACLs are used to split game traffic to the paid proxies
   acl ptc_auth hdr_dom(host) -i sso.pokemon.com
   acl pgorelease hdr_dom(host) -i pgorelease.nianticlabs.com
 
-  # Only use this if you are dropping traffic.
-  #http-request silent-drop if host_name
+ # NAT static host names to a different backend
+  # This ACL looks for the port 9001 in your backendurl when Manager sends data to RDM.
+  acl port_rdm url_port 9001
 
-  # This line is used to send Manager traffic to RDM instead of the external proxies.
-  use_backend rdm if port_rdm
+  # These two ACLs are used to drop traffic. The one that's enabled should stop iOS updates
+  #acl host_name hdr_dom(host) -i ispoofer.com globalplusplus.com 104.31.70.46 104.31.71.46 104.25.91.97 104.25.92.97
+  acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com apple.com
+
+  # These two ACLs are used when a Squid backend as default backend is used so you can split these out to the paid proxies
+  #acl auth hdr_dom(host) -i pgorelease.nianticlabs.com sso.pokemon.com
+  #acl gd hdr_dom(host) -i api.ipotter.cc ipotter.cc ipotter.app 104.28.10.9 104.28.11.9
+
+  # If your data usage is high, I would suggest using this ACL and the second "silent-drop" so map tiles aren't downloaded.
+  #acl tiles hdr_dom(host) -i maps.nianticlabs.com
+
+  # Only use one of these to drop traffic.
+  http-request deny if host_name
+  #http-request deny if host_name || tiles
 
   # These are used to split the traffic on the paid proxies
   use_backend proxy_ptc if ptc_auth
   use_backend proxy_nia if pgorelease
 
-  # This line is used to send all traffic not related to RDM or the game to the Squid proxy on the intranet. 
+  # This line is used to send Manager traffic to RDM instead of the external proxies.
+  use_backend rdm if port_rdm
+
+  # This line is used when a Squid proxy is setup so we can send auth and gd requests through the paid proxies.
+  #use_backend proxy_out if auth || gd
+
+  # This line is used to send all traffic not related to RDM or the game to the Squid proxy on the intranet.
   default_backend squid
 
 backend rdm
   # If you're setting up HAProxy on the same network, use `balance source`.
   # If you're setting up HAProxy on an externally hosted server, use `balance leastconn`.
   balance source
-  #balance leastconn
+  #balance leastconn					
+  fullconn 1000
 
   # Note that HAProxy messes up the HTTP header when sending data to RDM directly so we sent it to Nginx first.
   # We used 9002 as a port that Nginx is listening to because HAProxy would try to pass the whole address as a URI.
@@ -129,16 +162,16 @@ backend rdm
 
 backend squid
   balance source
-  fullconn 1000
-
+  fullconn 10000
+  mode http
   server squid localhost:3128
 
 backend proxy_ptc
   # If you're setting up HAProxy on the same network, use `balance source`.
   # If you're setting up HAProxy on an externally hosted server, use `balance leastconn`.
   balance source
-  #balance leastconn
-  
+  #balance leastconn					
+
   # Set the max connections for each server to 1000 so you don't drop data
   # This defauls to 10% of maxconn or 10% of the default (which limits it to 200 connections)
   fullconn 1000
@@ -146,37 +179,53 @@ backend proxy_ptc
   # This section of external-check settings is important for checking if your proxy IP is banned.
   option external-check
   external-check path "/usr/bin:/bin"
+
   # The `external-check command` is used with the location of the file created in the next section.
-  external-check command /home/rdmadmin/bancheck_ptc.sh
+  external-check command /home/mapadmin/bancheck_ptc.sh
 
   # The `reqadd Proxy-Authorization` is only needed if your proxies require authentication
   # Replace base64EncodedAccountInfo with your base64 encoded username and password
   # Run this command to generate the base64: echo -n "username:password" | base64
   #reqadd Proxy-Authorization:\ Basic\ base64EncodedAccountInfo
 
+
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
   # It will be put back into rotation if it passes the checker twice in a row.
   # Below are example proxy lines. Add them in the following format:
-  #server <server2 name> <proxy IP>:<port> check inter 20s fall 3 rise 2
-  server tor_prox01 192.168.0.6:9101 check inter 20s fall 3 rise 2
-  server tor_prox02 192.168.0.6:9102 check inter 20s fall 3 rise 2
-  server mpp_proxy01 104.140.211.135:312 check inter 20s fall 3 rise 2
-  server mpp_proxy02 50.31.9.214:312 check inter 20s fall 3 rise 2
+  server proxy1 1.2.3.4:3128 check inter 20s fall 3 rise 2
+  server proxy2 5.6.7.8:3128 check inter 20s fall 3 rise 2
+
 
 backend proxy_nia
-  # Use the same settings and servers as proxy_ptc except the banckcheck script below
+  # If you're setting up HAProxy on the same network, use `balance source`.
+  # If you're setting up HAProxy on an externally hosted server, use `balance leastconn`.
   balance source
+
+  # Set the max connections for each server to 1000 so you don't drop data
+  # This defauls to 10% of maxconn or 10% of the default (which limits it to 200 connections)
   fullconn 1000
+
+  # This section of external-check settings is important for checking if your proxy IP is banned.
   option external-check
   external-check path "/usr/bin:/bin"
-  external-check command /home/rdmadmin/bancheck_nia.sh
+
+  # The `external-check command` is used with the location of the file created in the next section.
+  external-check command /home/mapadmin/bancheck_nia.sh
+
+  # The `reqadd Proxy-Authorization` is only needed if your proxies require authentication
+  # Replace base64EncodedAccountInfo with your base64 encoded username and password
+  # Run this command to generate the base64: echo -n "username:password" | base64
   #reqadd Proxy-Authorization:\ Basic\ base64EncodedAccountInfo
-  #server <server2 name> <proxy IP>:<port> check inter 20s fall 3 rise 2
-  server tor_prox01 192.168.0.6:9101 check inter 20s fall 3 rise 2
-  server tor_prox02 192.168.0.6:9102 check inter 20s fall 3 rise 2
-  server mpp_proxy01 104.140.211.135:312 check inter 20s fall 3 rise 2
-  server mpp_proxy02 50.31.9.214:312 check inter 20s fall 3 rise 2
+  
+
+
+  # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
+  # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
+  # It will be put back into rotation if it passes the checker twice in a row.
+  # Below are example proxy lines. Add them in the following format:
+  server proxy1 1.2.3.4:3128 check inter 20s fall 3 rise 2
+  server proxy2 5.6.7.8:3128 check inter 20s fall 3 rise 2
 ```
 
 --------------------------------------------------
@@ -217,7 +266,7 @@ Note that this script must exit with `0` for the check to pass. You can test thi
 - `echo $?` #This displays the results of the script. It will most likely be 0 or 1. 
 
 --------------------------------------------------
-Edit the Ngixn config file: /etc/nginx/conf.d/default.conf. 
+Nginx config
 Add a server block for HAProxy to pass data to RDM with the correct URI. I turned the logs off because they fill fast.
 If Nginx is on a different server than HAProxy, update the server_name address.
 If Nginx is on a different server than RDM, update the proxy_pass address.
@@ -270,15 +319,18 @@ All data should flow through the frontend. Then connections should show up for e
 In "proxy_out", the "chk" column near the end is how many checks your proxies fail against the script.
 
 --------------------------------------------------
-I suggest testing this on one phone to ensure it is working correctly before switch all devices.
-Update the phones' proxy settings to use HAProxy. 
-- Settings > Wifi > SSID > Proxy > Manual > Enter your information.
+I suggest testing this on one device to ensure it is working correctly before switch all devices.
+Update the device proxy settings to use HAProxy. 
+- iOS - Settings > Wifi > SSID > Proxy > Manual > Enter your information.
+- Android ADB - adb shell settings put global http_proxy 192.168.0.6:9100 (Replace IP and Port with your information)
 
-You may also want to set a public DNS since addresses have resolution problems. 
-- Settings > Wifi > SSID > DNS
-- Google's DNSs are 8.8.8.8 and 8.8.4.4, either will work.
+*Optional if you have resoultion problems with public addresses*
+You may also want to set a public DNS since addresses have resolution problems. Google DNS are 8.8.8.8 and 8.8.4.4, Cloudflare 1.1.1.1 and 1.0.0.1, or any other public DNS will work.
+- iOS - Settings > Wifi > SSID > DNS
+- Android ADB - adb shell setprop net.eth0.dns1 8.8.8.8 
+adb shell setprop net.eth0.dns2 4.4.4.4
 
-In the IPA config, ensure your backend URL uses the IP address and port 9001 of the HAProxy server.
-Check that the phone's data makes it to the map and you should be done.
+In the MITM config, ensure your backend URL uses the IP address and port 9001 of the HAProxy server.
+Check that the phone's or atv data makes it to the map and you should be done.
 
 --------------------------------------------------
