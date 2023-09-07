@@ -242,7 +242,8 @@ VPT=$2
 RIP=$3
 RPT=$4
 
-cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
+#I did require username and password so added 'username:password' ahead of the -x. But could not have a space for some reason
+cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -U 'username:password'-x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
 exit ${?}
 ```
 Add this ot the bancheck_nia.sh file:
@@ -306,10 +307,12 @@ sudo service haproxy status
 --------------------------------------------------
 Test the setup with curl. The first one should show "The file / was not found." because you reached RDM's data port.
 The second one should show "HTTP/1.1 200 Connection established" and some other junk.
+The third one should also show "HTTP/1.1 200 Connection established" and some other junk. HOWEVER when you look at your Proxy status you should see this connection went out the Squid backend.
 Relace the IP address with the host address of HAProxy.
 ```
 curl -x 192.168.0.6:9100 http://192.168.0.6:9001/
 curl -I -x 192.168.0.6:9100 https://sso.pokemon.com/sso/login
+curl -I -x 192.168.0.6:9100 https://google.com
 ```
 
 --------------------------------------------------
