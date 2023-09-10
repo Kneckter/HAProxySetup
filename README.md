@@ -9,7 +9,9 @@ HAProxy SHOULD be installed on the same network as the MITM clients.
 Otherwise, if you use an external server, they will all share one public IP address and load balance differently (still works, just follow the notes). The RDM and Nginx servers do not need to be local.
 
 If you want to run this on a local Mac, you can figure out the difference in settings (install with `brew install haproxy`) or install VirtualBox and load an Ubuntu VM on your Mac.
-
+--------------------------------------------------
+Notes and Warnings
+HAProxy doesn't work with paid proxies that are Socks5 or SSL, at least not if they require authentication. I never tried SOCS or SSL paid proxies that don't require authentication. 
 --------------------------------------------------
 Install HAProxy 2.6 LTS with these commands on debian 11:
 
@@ -183,11 +185,10 @@ backend proxy_ptc
   # The `external-check command` is used with the location of the file created in the next section.
   external-check command /home/mapadmin/bancheck_ptc.sh
 
-  # The `reqadd Proxy-Authorization` is only needed if your proxies require authentication
+  # The 'http-request add-header Proxy-Authorization` is only needed if your proxies require authentication
   # Replace base64EncodedAccountInfo with your base64 encoded username and password
   # Run this command to generate the base64: echo -n "username:password" | base64
-  #reqadd Proxy-Authorization:\ Basic\ base64EncodedAccountInfo
-
+  #http-request add-header Proxy-Authorization "Basic base64EncodedAccountInfo"
 
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
@@ -213,12 +214,10 @@ backend proxy_nia
   # The `external-check command` is used with the location of the file created in the next section.
   external-check command /home/mapadmin/bancheck_nia.sh
 
-  # The `reqadd Proxy-Authorization` is only needed if your proxies require authentication
+  # The 'http-request add-header Proxy-Authorization` is only needed if your proxies require authentication
   # Replace base64EncodedAccountInfo with your base64 encoded username and password
   # Run this command to generate the base64: echo -n "username:password" | base64
-  #reqadd Proxy-Authorization:\ Basic\ base64EncodedAccountInfo
-  
-
+  #http-request add-header Proxy-Authorization "Basic base64EncodedAccountInfo"
 
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
