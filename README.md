@@ -29,8 +29,8 @@ echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
  ```
  Then, use the following commands:
 ```
-apt-get update
-apt-get install haproxy=2.6.\*
+apt update
+apt install haproxy=2.6.\*
 ```
 You will get the _latest_ release of HAProxy 2.6 (and stick to this branch).
 
@@ -42,8 +42,8 @@ https://haproxy.debian.net/
 --------------------------------------------------
 Install Squid to make your server into a proxy for use as a backend to only proxy the auth requests. No changes need to be made to the Squid config to work with this. Use these commands for debian-based linux:
 ```
-apt-get update
-apt-get install squid
+apt update
+apt install squid
 ```
 --------------------------------------------------
 *Optional configuration*
