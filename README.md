@@ -47,20 +47,10 @@ apt install squid
 ```
 --------------------------------------------------
 *Optional configuration*
-Configure squid to cache static assets to help lower your data usage with the below configuration:
+Configure squid to cache static assets to help lower your data usage with the below configuration added to /etc/squid/squid.conf
 ```
-maximum_object_size 200 MB
-cache_dir ufs /var/spool/squid 4096 16 256
-logfile_rotate 5
-cache_store_log daemon:/var/log/squid/store.log
-refresh_pattern -i \.(gif|png|jpg|jpeg|ico|bmp|obj)$ 10080 90% 43200 override-expire ignore-no-cache ignore-no-store ignore-private
-refresh_pattern -i \.(iso|avi|mov|wav|qt|mpg|mp3|mp4|mpeg|swf|flv|x-flv|wmv|au|mid|gmm)$ 43200 90% 432000 override-expire ignore-no-cache ignore-no-store ignore-private
-refresh_pattern -i \.(deb|rpm|exe|zip|tar|gz|tgz|ram|rar|bin|ppt|doc|tiff|tif|arj|lha|lzh|hqx|pdf|rtf)$ 10080 90% 43200 override-expire ignore-no-cache ignore-no-store ignore-private
-refresh_pattern -i \.index.(html|htm)$ 0 40% 10080
-refresh_pattern -i \.(html|htm|css|js|jsp|txt|xml|tsv|json)$ 1440 40% 40320
-refresh_pattern . 0 40% 40320
+https://github.com/StuartMedia/HAProxySetup/blob/8593777b0857cd5c788cefe4641ec11ce445df02/squid.conf#L1-L10
 ```
-
 Note that you will have to comment out the old `refresh_pattern .` line.
 
 --------------------------------------------------
