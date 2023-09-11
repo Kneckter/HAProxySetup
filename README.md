@@ -49,6 +49,7 @@ apt install squid
 *Optional configuration*
 Configure squid to cache static assets to help lower your data usage with the below configuration added to /etc/squid/squid.conf
 ```
+[Squid.conf file](/squid.conf)
 https://github.com/StuartMedia/HAProxySetup/blob/8593777b0857cd5c788cefe4641ec11ce445df02/squid.conf#L1-L10
 ```
 Note that you will have to comment out the old `refresh_pattern .` line.
@@ -74,11 +75,10 @@ VPT=$2
 RIP=$3
 RPT=$4
 
-#I did require username and password so added 'username:password' ahead of the -x. But could not have a space for some reason
-cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -U 'username:password'-x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
+cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
 exit ${?}
 ```
-Add this ot the bancheck_nia.sh file:
+Add this to the bancheck_nia.sh file:
 ```
 #!/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -91,10 +91,10 @@ cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT
 exit ${?}
 ```
 
-Note that this script must exit with `0` for the check to pass. You can test this script manually by running the following commands:
-
-- `RIP=ProxyIPAddress` #This sets the RIP environment variable to the proxy IP address. You can use the HAProxy address.
-- `RTP=ProxyPort` #This sets the RTP environment variable to the proxy IP port. You can use the HAProxy port.
+Note that this script must exit with `0` for the check to pass. 
+You can test this script manually by running the following commands in same order as provided:
+- `RIP=ProxyIPAddress` #This sets the RIP environment variable to the proxy IP address. Use the HAProxy address.
+- `RTP=ProxyPort` #This sets the RTP environment variable to the proxy IP port. Use the HAProxy port.
 - `./banncheck_ptc.sh` #This runs the script.
 - `echo $?` #This displays the results of the script. It will most likely be 0 or 1. 
 
@@ -103,6 +103,8 @@ Nginx config
 Add a server block for HAProxy to pass data to RDM with the correct URI. I turned the logs off because they fill fast.
 If Nginx is on a different server than HAProxy, update the server_name address.
 If Nginx is on a different server than RDM, update the proxy_pass address.
+If this setup is a server with just haproxy and nginx file to update is /etc/nginx/sites-available/default
+      - If an existing nginx is being used adjust accordingly.
 ```
 server {
   listen 9002;
