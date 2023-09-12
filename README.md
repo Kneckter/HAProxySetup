@@ -1,4 +1,4 @@
-# HAProxy Setup for Mapping
+That's# HAProxy Setup for Mapping
 
 This guide will assist you in setting up HAProxy as a load balancer for multiple proxy endpoints. 
 ## Notes and Warnings
@@ -318,7 +318,7 @@ exit ${?}
 ```
 
 ---
-#Troubleshooting
+# Troubleshooting
 ## Banchecker Tests
 These scripts must exit with `0` for the check to pass. 
 You can test these scripts manually by running the following commands in order:
