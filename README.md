@@ -43,8 +43,50 @@ apt update
 apt install squid
 ```
 
-## Configuration
-## Squid Configuration (optional)
+# Banchecker scripts
+Next, create `bancheck_ptc.sh` and `bancheck_nia.sh` files using the command 
+```
+`touch bancheck_ptc.sh && touch bancheck_nia.sh`
+```
+These files will help check if your proxies are working with Pokemon and Niantic. 
+
+Make these files executable by running the command 
+```
+`chmod +x bancheck_ptc.sh && chmod +x bancheck_nia.sh`
+```
+
+Ensure these files are saved in the same location as specified in the "external-check command" line of haproxy.conf. 
+
+If your proxy uses a username/password instead of an IP whitelist, you will need to add `-U username:password` before the `-x` flag. 
+
+Add this to the `bancheck_ptc.sh` file:
+```
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+VIP=$1
+VPT=$2
+RIP=$3
+RPT=$4
+
+cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
+exit ${?}
+```
+
+Add this to the `bancheck_nia.sh` file:
+```
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+VIP=$1
+VPT=$2
+RIP=$3
+RPT=$4
+
+cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://pgorelease.nianticlabs.com/plfe/version 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
+exit ${?}
+```
+
+## Configurations
+### Squid Configuration (optional)
 
 Configure Squid to cache static assets, which can help reduce your data usage.
 Find and Comment out the existing `refresh_pattern .` line.
@@ -279,50 +321,6 @@ sudo service nginx restart
 sudo service haproxy restart
 sudo service haproxy status
 ```
-
----
-# Banchecker scripts
-Next, create `bancheck_ptc.sh` and `bancheck_nia.sh` files using the command 
-```
-`touch bancheck_ptc.sh && touch bancheck_nia.sh`
-```
-These files will help check if your proxies are working with Pokemon and Niantic. 
-
-Make these files executable by running the command 
-```
-`chmod +x bancheck_ptc.sh && chmod +x bancheck_nia.sh`
-```
-
-Ensure these files are saved in the same location as specified in the "external-check command" line of haproxy.conf. 
-
-If your proxy uses a username/password instead of an IP whitelist, you will need to add `-U username:password` before the `-x` flag. 
-
-Add this to the `bancheck_ptc.sh` file:
-```
-#!/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-VIP=$1
-VPT=$2
-RIP=$3
-RPT=$4
-
-cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://sso.pokemon.com/sso/login 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
-exit ${?}
-```
-
-Add this to the `bancheck_nia.sh` file:
-```
-#!/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-VIP=$1
-VPT=$2
-RIP=$3
-RPT=$4
-
-cmd=`curl -I -s -A "pokemongo/1 CFNetwork/758.5.3 Darwin/15.6.0" -x ${RIP}:${RPT} https://pgorelease.nianticlabs.com/plfe/version 2>/dev/null | grep -e "HTTP/2 200" -e "HTTP/1.1 200 OK"`
-exit ${?}
-```
-
 ---
 # Troubleshooting
 ## Banchecker Tests
