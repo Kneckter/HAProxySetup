@@ -111,34 +111,39 @@ Before proceeding, ensure you create a backup of the config file: `/etc/haproxy/
 Clear everything in `haproxy.cfg` and insert the text provided below. 
 Make sure to read the comments to customize the setup for your needs:
 
-```
+```conf
+# Global settings
 global
+  # Enable external checks and allow insecure forks
   external-check
-  insecure-fork-wanted				  
+  insecure-fork-wanted
+
+  # Configure logging change from 'notice' to 'debug' or 'info' to aid troubleshooting
   log /dev/log local1 notice
 
-  # Default SSL material locations
+  # Set default locations for SSL material
   ca-base /etc/ssl/certs
   crt-base /etc/ssl/private
 
-  # Default ciphers to use on SSL-enabled listening sockets.
-  # For more information, see ciphers(1SSL). This list is from:
-  #  https://hynek.me/articles/hardening-your-web-servers-ssl-ciphers/
-  # An alternative list with additional directives can be obtained from
-  #  https://mozilla.github.io/server-side-tls/ssl-config-generator/?server=haproxy
+  # Set default ciphers for SSL-enabled listening sockets
   ssl-default-bind-ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:RSA+AESGCM:RSA+AES:!aNULL:!MD5:!DSS
   ssl-default-bind-options no-sslv3
 
+# Default settings
 defaults
   log global
   mode http
   option httplog
   option dontlognull
   option forwardfor
+
+  # Set timeouts (in milliseconds)
   timeout connect 5000ms
   timeout client 50000ms
   timeout server 50000ms
   timeout check 90s
+
+  # Specify custom error files for HTTP status codes
   errorfile 400 /etc/haproxy/errors/400.http
   errorfile 403 /etc/haproxy/errors/403.http
   errorfile 408 /etc/haproxy/errors/408.http
@@ -147,64 +152,67 @@ defaults
   errorfile 503 /etc/haproxy/errors/503.http
   errorfile 504 /etc/haproxy/errors/504.http
 
+# Frontend configuration (proxy_in)
 frontend proxy_in
   bind *:9100
-  # The stats page is not required but it should be used during the initial setup so you know it works.
+
+  # Enable stats page at /haproxy?stats
   stats uri /haproxy?stats
+
   mode http
   option http-use-proxy-header
   option accept-invalid-http-request
 
- # Set the max connections to the frontend higher than the default 2000
-  maxconn 5000
+ # Increase max connections to frontend to more than the default of 2000
+ maxconn 5000
 
-  # These two ACLs are used to split game traffic to the paid proxies
-  acl ptc_auth hdr_dom(host) -i sso.pokemon.com
-  acl pgorelease hdr_dom(host) -i pgorelease.nianticlabs.com
+ # ACLs to split game traffic to the paid proxies
+ acl ptc_auth hdr_dom(host) -i sso.pokemon.com
+ acl pgorelease hdr_dom(host) -i pgorelease.nianticlabs.com
 
- # NAT static host names to a different backend
- # This ACL looks for the port 9001 in your backendurl when Manager sends data to RDM.
-  acl port_rdm url_port 9001
+ # ACL to NAT static host names to a different backend (looks for port 9001 in backend URL)
+ acl port_rdm url_port 9001
 
-  # These two ACLs are used to drop traffic. The one that's enabled should stop iOS updates
-  #acl host_name hdr_dom(host) -i ispoofer.com globalplusplus.com 104.31.70.46 104.31.71.46 104.25.91.97 104.25.92.97
-  acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com apple.com
+ # ACL to drop traffic (stops iOS updates)
+ acl host_name hdr_dom(host) -i mesu.apple.com appldnld.apple.com apple.com
 
-  # These two ACLs are used when a Squid backend as default backend is used so you can split these out to the paid proxies
-  #acl auth hdr_dom(host) -i pgorelease.nianticlabs.com sso.pokemon.com
-  #acl gd hdr_dom(host) -i api.ipotter.cc ipotter.cc ipotter.app 104.28.10.9 104.28.11.9
+ # These two ACLs are used when a Squid backend is default backend so you can split these out to the paid proxies
+ acl auth hdr_dom(host) -i pgorelease.nianticlabs.com sso.pokemon.com
+ acl gd hdr_dom(host) -i api.ipotter.cc ipotter.cc ipotter.app 104.28.10.9 104.28.11.9
 
-  # If your data usage is high, I would suggest using this ACL and the second "silent-drop" so map tiles aren't downloaded.
-  #acl tiles hdr_dom(host) -i maps.nianticlabs.com
+ # If data usage is high use this ACL and the second "http-request deny" so map tiles aren't downloaded.
+ #acl tiles hdr_dom(host) -i maps.nianticlabs.com
+  
+ # Only use one of these to drop traffic (uncomment as needed)
+ http-request deny if host_name
+ #http-request deny if host_name || tiles
 
-  # Only use one of these to drop traffic.
-  http-request deny if host_name
-  #http-request deny if host_name || tiles
+ # Split traffic on the paid proxies based on ACLs 
+ use_backend proxy_ptc if ptc_auth
+ use_backend proxy_nia if pgorelease
 
-  # These are used to split the traffic on the paid proxies
-  use_backend proxy_ptc if ptc_auth
-  use_backend proxy_nia if pgorelease
+ # Send Manager traffic to RDM instead of external proxies 
+ use_backend rdm if port_rdm 
 
-  # This line is used to send Manager traffic to RDM instead of the external proxies.
-  use_backend rdm if port_rdm
+ # Send all other traffic not related to RDM or game to Squid proxy
+ default_backend squid
 
-  # This line is used when a Squid proxy is setup so we can send auth and gd requests through the paid proxies.
-  #use_backend proxy_out if auth || gd
-
-  # This line is used to send all traffic not related to RDM or the game to the Squid proxy on the intranet.
-  default_backend squid
-
+# Backend configurations (rdm, squid, proxy_ptc, proxy_nia)
 backend rdm
   # If you're setting up HAProxy on the same network, use `balance source`.
   # If you're setting up HAProxy on an externally hosted server, use `balance leastconn`.
   balance source
-  #balance leastconn					
+  #balance leastconn
+  
+  # Set the max connections for each server to 1000 so you don't drop data
+  # This defauls to 10% of maxconn or 10% of the default (which limits it to 200 connections)  
   fullconn 1000
 
-  # Note that HAProxy messes up the HTTP header when sending data to RDM directly so we sent it to Nginx first.
+  # Note HAProxy messes up the HTTP header when sending data to RDM directly so we send it to Nginx first.
   # We used 9002 as a port that Nginx is listening to because HAProxy would try to pass the whole address as a URI.
-  # This assumes Nginx is installed on the same machine HAProxy is. If not, change the IP address to the server Nginx is installed on.
-  # A server block for Nginx is explained in the below sections.
+  # This assumes Nginx is installed on the same machine HAProxy is. 
+  # If not, change the IP address to the server Nginx is installed on.
+  # A server block for Nginx is explained elsewhere.
   server rdm 192.168.1.171:9002
 
 backend squid
@@ -230,9 +238,10 @@ backend proxy_ptc
   # The `external-check command` is used with the location of the file created in the next section.
   external-check command /home/tstuart/bancheck_ptc.sh
 
-  # The `reqadd Proxy-Authorization` is only needed if your proxies require authentication
+  # The `http-request set-header Proxy-Authorization` is only needed if your proxies require authentication
   # Replace base64EncodedAccountInfo with your base64 encoded username and password
   # Run this command to generate the base64: echo -n "username:password" | base64
+  #http-request set-header Proxy-Authorization Basic\ base64EncodedAccountInfo
 
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
@@ -261,14 +270,15 @@ backend proxy_nia
   # The `external-check command` is used with the location of the file created in the next section.
   external-check command /home/tstuart/bancheck_nia.sh
 
-  # The `reqadd Proxy-Authorization` is only needed if your proxies require authentication
+  # The `http-request set-header Proxy-Authorization` is only needed if your proxies require authentication
   # Replace base64EncodedAccountInfo with your base64 encoded username and password
   # Run this command to generate the base64: echo -n "username:password" | base64
+  #http-request set-header Proxy-Authorization Basic\ base64EncodedAccountInfo
 
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
   # It will be put back into rotation if it passes the checker twice in a row.
-  # Below are example proxy lines. Add them in the following format:
+  # Below are example proxy lines. Add or change using same format:
     server proxy1 196.51.69.54:8800 check inter 20s fall 3 rise 2
     server proxy2 196.51.69.94:8800 check inter 20s fall 3 rise 2
     server proxy3 192.126.135.49:8800 check inter 20s fall 3 rise 2
