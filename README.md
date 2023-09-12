@@ -1,6 +1,7 @@
 # HAProxy Setup for Mapping
 
-This guide will assist you in setting up HAProxy as a load balancer for multiple proxy endpoints. 
+This guide will assist you in setting up HAProxy as a load balancer for multiple proxy endpoints. Paid endpoints highly recommended!
+
 ## Notes and Warnings
 
 HAProxy doesn't work with paid proxies that are Socks5 or SSL, at least not if they require authentication. I never tried SOCKS or SSL paid proxies that don't require authentication. 
@@ -45,22 +46,23 @@ apt install squid
 
 ### Banchecker scripts
 Next, create `bancheck_ptc.sh` and `bancheck_nia.sh` files using the command 
-```
+```bash
 `touch bancheck_ptc.sh && touch bancheck_nia.sh`
 ```
 These files will help check if your proxies are working with Pokemon and Niantic. 
 
 Make these files executable by running the command 
-```
+```bash
 `chmod +x bancheck_ptc.sh && chmod +x bancheck_nia.sh`
 ```
 
 Ensure these files are saved in the same location as specified in the "external-check command" line of haproxy.conf. 
+or place them in /usr/local/bin
 
 If your proxy uses a username/password instead of an IP whitelist, you will need to add `-U username:password` before the `-x` flag. 
 
 Add this to the `bancheck_ptc.sh` file:
-```
+```shell
 #!/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 VIP=$1
@@ -73,7 +75,7 @@ exit ${?}
 ```
 
 Add this to the `bancheck_nia.sh` file:
-```
+```shell
 #!/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 VIP=$1
@@ -92,7 +94,7 @@ Configure Squid to cache static assets, which can help reduce your data usage.
 Find and Comment out the existing `refresh_pattern .` line.
 Add the following configuration to `/etc/squid/squid.conf`:
 
-```
+```squid
 maximum_object_size 200 MB
 cache_dir ufs /var/spool/squid 4096 16 256
 logfile_rotate 5
@@ -111,7 +113,7 @@ Before proceeding, ensure you create a backup of the config file: `/etc/haproxy/
 Clear everything in `haproxy.cfg` and insert the text provided below. 
 Make sure to read the comments to customize the setup for your needs:
 
-```conf
+```haproxy
 # Global settings
 global
   # Enable external checks and allow insecure forks
@@ -208,12 +210,12 @@ backend rdm
   # This defauls to 10% of maxconn or 10% of the default (which limits it to 200 connections)  
   fullconn 1000
 
-  # Note HAProxy messes up the HTTP header when sending data to RDM directly so we send it to Nginx first.
+  # HAProxy messes up the HTTP header when sending data to RDM directly so we send it to Nginx first.
   # We used 9002 as a port that Nginx is listening to because HAProxy would try to pass the whole address as a URI.
   # This assumes Nginx is installed on the same machine HAProxy is. 
   # If not, change the IP address to the server Nginx is installed on.
-  # A server block for Nginx is explained elsewhere.
-  server rdm 192.168.1.171:9002
+  # A server block for Nginx is required.
+  server rdm 127.0.0.1:9002
 
 backend squid
   balance source
@@ -246,12 +248,9 @@ backend proxy_ptc
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
   # It will be put back into rotation if it passes the checker twice in a row.
-  # Below are example proxy lines. Add them in the following format:
-    server proxy1 193.38.242.179:8800 check inter 20s fall 3 rise 2
-    server proxy2 193.38.242.32:8800 check inter 20s fall 3 rise 2
-    server proxy3 196.51.90.88:8800 check inter 20s fall 3 rise 2
-    server proxy4 196.51.69.253:8800 check inter 20s fall 3 rise 2
-    server proxy5 196.51.69.55:8800 check inter 20s fall 3 rise 2
+  # Below are example proxy lines. Add or change using same format, entering IP and Port for your paid proxies:
+    server proxy1 xxx.xxx.xxx.xxx:8800 check inter 20s fall 3 rise 2
+    server proxy2 xxx.xxx.xxx.xxx:8800 check inter 20s fall 3 rise 2
 
 backend proxy_nia
   # If you're setting up HAProxy on the same network, use `balance source`.
@@ -278,12 +277,9 @@ backend proxy_nia
   # The `check inter 20s fall 3 rise 2` setting will run the ban script every 20 seconds.
   # If an address fails 3 times, it will be taken down and the other addresses will get its traffic.
   # It will be put back into rotation if it passes the checker twice in a row.
-  # Below are example proxy lines. Add or change using same format:
-    server proxy1 196.51.69.54:8800 check inter 20s fall 3 rise 2
-    server proxy2 196.51.69.94:8800 check inter 20s fall 3 rise 2
-    server proxy3 192.126.135.49:8800 check inter 20s fall 3 rise 2
-    server proxy4 196.51.90.202:8800 check inter 20s fall 3 rise 2
-    server proxy5 192.126.135.196:8800 check inter 20s fall 3 rise 2
+  # Below are example proxy lines. Add or change using same format, entering IP and Port for your paid proxies:
+    server proxy1 xxx.xxx.xxx.xxx:8800 check inter 20s fall 3 rise 2
+    server proxy2 xxx.xxx.xxx.xxx:8800 check inter 20s fall 3 rise 2
 ```
 ### Nginx Configuration
 
@@ -321,8 +317,6 @@ If you use Apache as your web service, here's an example of the above configurat
 </VirtualHost>
 ```
 
----
-
 Test Nginx and restart it. Restart HAProxy as well and then check the status for any errors. Logs are sent to `/var/log/` if needed.
 
 ```bash
@@ -333,7 +327,8 @@ sudo service haproxy status
 ```
 ---
 # Troubleshooting
-## Banchecker Tests
+
+## Banchecker scripts tests
 These scripts must exit with `0` for the check to pass. 
 You can test these scripts manually by running the following commands in order:
 - `RIP=ProxyIPAddress` #This sets the RIP environment variable to the proxy IP address. Use the HAProxy address.
@@ -343,23 +338,23 @@ You can test these scripts manually by running the following commands in order:
   
 ## Proxy tests
 Test the setup with curl. 
-The first command should show "The file / was not found." because you reached RDM's data port. The second and third commands should show "HTTP/1.1 200 Connection established" and some other information.
+The first command should show "The file / was not found." because you reached RDM's data port. 
+The other 3 commands should show "HTTP/1.1 200 Connection established" and some other information.
 
 Replace the IP address with the host address of HAProxy.
 
 ```bash
-curl -x 192.168.1.171:9100 http://192.168.0.6:9001/
+curl -x 192.168.1.171:9100 http://192.168.1.171:9001/
 curl -I -x 192.168.1.171:9100 https://sso.pokemon.com/sso/login
+curl -I -x 192.168.1.171:9100 pgorelease.nianticlabs.com
 curl -I -x 192.168.1.171:9100 https://google.com
 ```
-
----
 
 View the stats page at `http://192.168.1.171:9100/haproxy?stats` to see that data went through all ends here.
 
 ---
 
-Before switching all devices, I suggest testing this on one device to ensure it is working correctly.
+Before switching all devices, test on one device to ensure it is working correctly.
 
 Update the device proxy settings to use HAProxy:
 - iOS: Settings > Wifi > SSID > Proxy > Manual > Enter your information.
