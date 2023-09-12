@@ -1,4 +1,4 @@
-That's# HAProxy Setup for Mapping
+# HAProxy Setup for Mapping
 
 This guide will assist you in setting up HAProxy as a load balancer for multiple proxy endpoints. 
 ## Notes and Warnings
@@ -282,10 +282,16 @@ sudo service haproxy status
 
 ---
 # Banchecker scripts
-Next, create `bancheck_ptc.sh` and `bancheck_nia.sh` files using the command `touch bancheck_ptc.sh && touch bancheck_nia.sh`. 
+Next, create `bancheck_ptc.sh` and `bancheck_nia.sh` files using the command 
+```
+`touch bancheck_ptc.sh && touch bancheck_nia.sh`
+```
 These files will help check if your proxies are working with Pokemon and Niantic. 
 
-Make these files executable by running the command `chmod +x bancheck_ptc.sh && chmod +x bancheck_nia.sh`. 
+Make these files executable by running the command 
+```
+`chmod +x bancheck_ptc.sh && chmod +x bancheck_nia.sh`
+```
 
 Ensure these files are saved in the same location as specified in the "external-check command" line of haproxy.conf. 
 
