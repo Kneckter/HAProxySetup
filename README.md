@@ -43,7 +43,7 @@ apt update
 apt install squid
 ```
 
-# Banchecker scripts
+### Banchecker scripts
 Next, create `bancheck_ptc.sh` and `bancheck_nia.sh` files using the command 
 ```
 `touch bancheck_ptc.sh && touch bancheck_nia.sh`
